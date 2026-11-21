@@ -45,6 +45,13 @@ func (r *TicketRepository) migrate() error {
 			sla_deadline DATETIME NOT NULL,
 			completed_at DATETIME,
 			breach_alerted BOOLEAN NOT NULL DEFAULT 0
+	);
+	
+	CREATE TABLE IF NOT EXISTS users (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			username TEXT NOT NULL UNIQUE,
+			password_hash TEXT NOT NULL,
+			created_at DATETIME NOT NULL
 	);`
 	_, err := r.db.Exec(query)
 	return err
@@ -131,4 +138,36 @@ func (r *TicketRepository) Update(t *domain.Ticket) error {
 	}
 
 	return nil
+}
+
+func (r *TicketRepository) CreateUser(u *domain.User) error {
+	query := `
+	INSERT INTO users (username, password_hash, created_at)
+	VALUES (?, ?, ?)`
+
+	res, err := r.db.Exec(query, u.Username, u.PasswordHash, u.CreatedAt.UTC())
+	if err != nil {
+		return err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+	u.ID = id
+	return nil
+}
+
+func (r *TicketRepository) GetUserByUsername(username string) (*domain.User, error) {
+	query := `
+	SELECT id, username, password_hash, created_at
+	FROM users
+	WHERE username = ?`
+	row := r.db.QueryRow(query, username)
+
+	var u domain.User
+	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
 }
